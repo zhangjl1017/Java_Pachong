@@ -1,0 +1,251 @@
+Hadoop HDFS文件操作的Java代码
+http://www.open-open.com/lib/view/open1373589519909.html
+
+    hadoop fs -mkdir /tmp/input              在HDFS上新建文件夹
+    Hadoop fs -put input1.txt /tmp/input  把本地文件input1.txt传到HDFS的/tmp/input目录下
+    hadoop fs -get  input1.txt /tmp/input/input1.txt  把HDFS文件拉到本地
+    hadoop fs -ls /tmp/output                  列出HDFS的某目录
+    hadoop fs -cat /tmp/ouput/output1.txt  查看HDFS上的文件
+    hadoop fs -rmr /home/less/hadoop/tmp/output  删除HDFS上的目录
+    hadoop dfsadmin -report 查看HDFS状态，比如有哪些datanode，每个datanode的情况
+    hadoop dfsadmin -safemode leave  离开安全模式
+    hadoop dfsadmin -safemode enter  进入安全模式
+    
+
+1、创建目录
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class MakeDir {
+	public static void main(String[] args) throws IOException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		Path path = new Path("/user/hadoop/data/20130709");
+		fs.create(path);
+		fs.close();
+	}
+}
+
+2、删除目录
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class DeleteDir {
+	public static void main(String[] args) throws IOException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		
+		Path path = new Path("/user/hadoop/data/20130710");
+		fs.delete(path);
+		fs.close();
+	}
+}
+
+3、写文件
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class WriteFile {
+	public static void main(String[] args) throws IOException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		Path path = new Path("/user/hadoop/data/write.txt");
+		FSDataOutputStream out = fs.create(path);
+		out.writeUTF("da jia hao,cai shi zhen de hao!");
+		fs.close();
+	}
+}
+
+4、读文件
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class ReadFile {
+	public static void main(String[] args) throws IOException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		Path path = new Path("/user/hadoop/data/write.txt");
+		
+		if(fs.exists(path)){
+			FSDataInputStream is = fs.open(path);
+			FileStatus status = fs.getFileStatus(path);
+			byte[] buffer = new byte[Integer.parseInt(String.valueOf(status.getLen()))];
+			is.readFully(0, buffer);
+			is.close();
+            fs.close();
+            System.out.println(buffer.toString());
+		}
+	}
+}
+
+5、上传本地文件到HDFS
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class CopyFromLocalFile {
+
+	public static void main(String[] args) throws IOException {
+		
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		Path src = new Path("/home/hadoop/word.txt");
+		Path dst = new Path("/user/hadoop/data/");
+		fs.copyFromLocalFile(src, dst);
+		fs.close();
+	}
+}
+
+6、删除文件
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class DeleteFile {
+
+	public static void main(String[] args) throws IOException {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		
+		Path path = new Path("/user/hadoop/data/word.txt");
+		fs.delete(path);
+		fs.close();
+	}
+}
+
+7、获取给定目录下的所有子目录以及子文件
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class GetAllChildFile {
+	static Configuration conf = new Configuration();
+	
+	
+	public static void main(String[] args)throws IOException {
+		FileSystem fs = FileSystem.get(conf);
+		Path path = new Path("/user/hadoop");
+		getFile(path,fs);
+		//fs.close();
+	}
+	
+	public static void getFile(Path path,FileSystem fs) throws IOException {
+		
+		FileStatus[] fileStatus = fs.listStatus(path);
+		for(int i=0;i<fileStatus.length;i++){
+			if(fileStatus[i].isDir()){
+				Path p = new Path(fileStatus[i].getPath().toString());
+				getFile(p,fs);
+			}else{
+				System.out.println(fileStatus[i].getPath().toString());
+			}
+		}
+	}
+
+}
+
+8、查找某个文件在HDFS集群的位置
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+
+public class FindFile {
+	
+	public static void main(String[] args) throws IOException {	
+		getFileLocal();
+	}
+	
+	/**
+	 * 查找某个文件在HDFS集群的位置
+	 * @Title:  
+	 * @Description: 
+	 * @param 
+	 * @return 
+	 * @throws
+	 */
+	public static void getFileLocal() throws IOException{
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		Path path = new Path("/user/hadoop/data/write.txt");
+		
+		FileStatus status = fs.getFileStatus(path);
+		BlockLocation[] locations = fs.getFileBlockLocations(status, 0, status.getLen());
+		
+		int length = locations.length;
+		for(int i=0;i<length;i++){
+			String[] hosts = locations[i].getHosts();
+			System.out.println("block_" + i + "_location:" + hosts[i]);
+		}
+	}
+	
+}
+
+9、HDFS集群上所有节点名称信息
+
+package com.hadoop.file;
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+
+public class FindFile {
+	
+	public static void main(String[] args) throws IOException {	
+		getHDFSNode();
+	}
+	
+	/**
+	 * HDFS集群上所有节点名称信息
+	 * @Title:  
+	 * @Description: 
+	 * @param 
+	 * @return 
+	 * @throws
+	 */
+	public static void getHDFSNode() throws IOException{
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+
+		DistributedFileSystem  dfs = (DistributedFileSystem)fs;
+		DatanodeInfo[] dataNodeStats = dfs.getDataNodeStats();
+		
+		for(int i=0;i<dataNodeStats.length;i++){
+			System.out.println("DataNode_" + i + "_Node:" + dataNodeStats[i].getHostName());
+		}
+		
+	}
+	
+	
+}
